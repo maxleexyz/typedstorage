@@ -1,10 +1,15 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 abstract class ISerializable {
   Map serialize();
   void deSerialize(Map value);
+}
+
+abstract class ICryptable {
+  Future<Uint8List> process(Uint8List value);
 }
 
 class TypeStorage {
@@ -19,7 +24,10 @@ class TypeStorage {
 
   String filePath;
 
-  TypeStorage init(String storageFilepath){
+  ICryptable cryptor;
+
+  TypeStorage init(String storageFilepath, {ICryptable cryptor}){
+    this.cryptor = cryptor;
     Timer.periodic(new Duration(seconds: 10), (timer) async{
       await this.save();
     });
@@ -40,7 +48,14 @@ class TypeStorage {
   Future reload() async {
     File file = File(filePath);
     if (await file.exists()) {
-      serialized = await file.readAsString();
+      final String savedStr = await file.readAsString();
+      if (savedStr.startsWith('encrypted:')){
+        final b64str = savedStr.substring(10);
+        final rawBytes = await cryptor.process(base64Decode(b64str));
+        serialized = utf8.decode(rawBytes.toList());
+      }else{
+        serialized=savedStr;
+      }
       if (serialized.isEmpty){
         coreStorage = {};
       }else {
@@ -57,7 +72,13 @@ class TypeStorage {
       File file = File(filePath);
       final writer = file.openWrite();
       serialized = current;
-      writer.add(utf8.encode(serialized));
+      var storedStr;
+      if (cryptor!=null){
+        storedStr = "encrypted:" + base64Encode((await cryptor.process(Uint8List.fromList(utf8.encode(serialized)))).toList());
+      }else{
+        storedStr = serialized;
+      }
+      writer.add(utf8.encode(storedStr));
       await writer.close();
     }
   }
@@ -81,23 +102,24 @@ class TypeStorage {
   }
 
   void addToList<T extends ISerializable>(T value){
-    final List<Map> list = coreStorage["LIST:" + T.toString()].cast<Map>() ?? <Map>[];
+
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
     list.add(value.serialize());
     coreStorage["LIST:" + T.toString()] = list;
   }
 
   T listPosition<T extends ISerializable>(int position, T Function() creator) {
-    final List<Map> list = coreStorage["LIST:" + T.toString()].cast<Map>() ?? <Map>[];
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
     if (position >= list.length){
       return null;
     }
     final T obj = creator();
-    obj.deSerialize(list[position]);
+    obj.deSerialize(list[position] as Map);
     return obj;
   }
 
   void removeAt<T extends ISerializable>(int position){
-    final List<Map> list = coreStorage["LIST:" + T.toString()].cast<Map>() ?? <Map>[];
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
     if ( position >= list.length || position < 0) {
       throw IndexError(position, list);
     }
@@ -106,7 +128,7 @@ class TypeStorage {
   }
 
   void updateAt<T extends ISerializable>(int position, T item){
-    final List<Map> list = coreStorage["LIST:" + T.toString()].cast<Map>() ?? <Map>[];
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
     if ( position >= list.length || position < 0) {
       throw IndexError(position, list);
     }
@@ -115,11 +137,11 @@ class TypeStorage {
   }
 
   List<T> findType<T extends ISerializable>(bool Function(T) where, int Function(T, T) sort, Function() creator){
-    final List<Map> list = coreStorage["LIST:" + T.toString()].cast<Map>() ?? <Map>[];
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
     final List<T> typedList = <T>[];
     for (final map in list){
       final obj = creator();
-      obj.deSerialize(map);
+      obj.deSerialize(map as Map);
       typedList.add(obj);
     }
     typedList.sort(sort);

@@ -1,8 +1,24 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:typedstorage/src/storage.dart';
+import 'package:coidentity/coidentity.dart';
 
+
+class Process implements ICryptable {
+  CoreIdentity identity;
+  Future init() async {
+    identity = CoreIdentity();
+    identity.setup(EncryptMethod.SECP256K1, null);
+  }
+  static final Uint8List SECRET = Uint8List.fromList([0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,1,2]);
+  static final Uint8List IV = Uint8List.fromList([1,2,3,4,5,6,7,8]);
+  @override
+  Future<Uint8List> process(Uint8List value) async{
+    return await identity.processFile(value, SECRET, IV);
+  }
+}
 
 class AType implements ISerializable{
   String name;
@@ -29,12 +45,20 @@ class AType implements ISerializable{
 
 void main() {
   test('test storage', () async{
-    final store = TypeStorage().init('/Users/alex/Projects/workspace/typedstorage/test/mydb.json');
+    String file_path = "/Users/alex/Projects/workspace/typedstorage/test/mydb.json";
+
+    if (await File(file_path).exists()) {
+      File(file_path).deleteSync();
+    }
+
+    final encProcess = new Process();
+    await encProcess.init();
+    final store = TypeStorage().init(file_path, cryptor: encProcess);
     await store.reload();
 
     store.setValue<String>('testKey1', "哈哈哈");
     store.setValue<int>('testKey2', 123123);
-    print(store.getValue<String>('testKey'));
+    print(store.getValue<String>('testKey1'));
     AType person = AType();
     person.name = "Alex";
     person.age=18;
