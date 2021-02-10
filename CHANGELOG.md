@@ -15,3 +15,7 @@
 ## [0.0.4] - TODO: add get first element of list method.
 
 * TODO:  add get first element of list method.
+
+## [0.0.5] - TODO: add a structure named list.
+
+* TODO: add a structure named list.

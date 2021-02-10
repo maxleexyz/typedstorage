@@ -83,5 +83,28 @@ void main() {
 
     await store.save();
 
+    String namedKey = 'student';
+
+    store.createNamedList(namedKey, () => AType());
+
+    for (final name in names){
+      final ps = AType();
+      ps.name = name;
+      ps.age=0;
+      store.namedListAppend<AType>(namedKey, ps);
+    }
+
+    final first = store.namedListFirst<AType>(namedKey);
+    expect(first.name, names[0]);
+
+    final ls = store.namedListQuery<AType>(namedKey, where: (item) => item.name.startsWith('A'), sort: (a, b)=> a.age.compareTo(b.age));
+    print('$ls');
+
+
+
+
+
+
+
   });
 }

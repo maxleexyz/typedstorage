@@ -45,6 +45,8 @@ class TypeStorage {
 
   Map coreStorage;
   String serialized;
+  Map<String, dynamic> namedListsKeys = Map<String, dynamic>();
+  Map<String, dynamic> namedListsType = Map<String, dynamic>();
 
   Future reload() async {
     File file = File(filePath);
@@ -83,6 +85,97 @@ class TypeStorage {
       await writer.close();
     }
   }
+
+  bool createNamedList<T>(String name, T Function() creator){
+    assert(!this.namedListsKeys.containsKey(name));
+    assert(!this.namedListsType.containsKey(name));
+    this.namedListsKeys[name] = creator;
+    this.namedListsType[name] = T.toString();
+    this.coreStorage["NAMED_LIST:$name"] = <Map>[];
+    return true;
+  }
+
+  bool deleteNamedList(String name){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    this.namedListsKeys.remove(name);
+    this.namedListsType.remove(name);
+    this.coreStorage.remove("NAMED_LIST:$name");
+    return true;
+  }
+
+  void namedListAppend<T extends ISerializable>(String name, T item){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    assert(this.namedListsType[name] == T.toString());
+    final List list = coreStorage["NAMED_LIST:$name"];
+    list.add(item.serialize());
+    coreStorage["NAMED_LIST:$name"] = list;
+  }
+
+  List<T> namedListAll<T extends ISerializable>(String name){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    assert(this.namedListsType[name] == T.toString());
+    final creator = this.namedListsKeys[name] as T Function();
+    final List list = coreStorage["NAMED_LIST:$name"];
+    List<T> results = <T>[];
+    for (final Map item in list){
+      final obj = creator();
+      obj.deSerialize(item);
+      results.add(obj);
+    }
+    return results;
+  }
+
+  List<T> namedListQuery<T extends ISerializable>(String name, {@required bool Function(T) where, int Function(T, T) sort, Function() creator}){
+    List<T> namedList = namedListAll<T>(name);
+    namedList.sort(sort);
+    return namedList.where(where).toList();
+  }
+
+  T namedListFirst<T extends ISerializable>(String name){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    assert(this.namedListsType[name] == T.toString());
+    final creator = this.namedListsKeys[name] as T Function();
+    final List list = coreStorage["NAMED_LIST:$name"];
+    if(list.length>0){
+      final obj = creator();
+      obj.deSerialize(list[0]);
+      return obj;
+    }
+    return null;
+  }
+
+  void namedListRemoveAt<T extends ISerializable>(String name, int index){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    assert(this.namedListsType[name] == T.toString());
+    final List list = coreStorage["NAMED_LIST:$name"];
+    list.removeAt(index);
+    coreStorage["NAMED_LIST:$name"] = list;
+  }
+
+  void nameListUpdateAt<T extends ISerializable>(String name, int index, T item){
+    assert(this.namedListsKeys.containsKey(name));
+    assert(this.namedListsType.containsKey(name));
+    assert(this.namedListsType[name] == T.toString());
+    final List list = coreStorage["NAMED_LIST:$name"];
+    list[index] = item.serialize();
+    coreStorage["NAMED_LIST:$name"] = list;
+  }
+
+  void namedListKeepWhere<T extends ISerializable>(String name, {@required bool Function(T) where}){
+    final list = this.namedListAll(name);
+    final newList = list.where(where).toList();
+    final resultList = <Map>[];
+    for (final item in newList){
+      resultList.add(item.serialize());
+    }
+    coreStorage["NAMED_LIST:$name"] = list;
+  }
+
 
   void setValue<T>(String key, T value){
     coreStorage[key] = value;
@@ -149,13 +242,7 @@ class TypeStorage {
   }
 
   List<T> findType<T extends ISerializable>({@required bool Function(T) where, int Function(T, T) sort, Function() creator}){
-    final List list = coreStorage["LIST:" + T.toString()] ?? [];
-    final List<T> typedList = <T>[];
-    for (final map in list){
-      final obj = creator();
-      obj.deSerialize(map as Map);
-      typedList.add(obj);
-    }
+    final List<T> typedList = this.listAll<T>(creator);
     typedList.sort(sort);
     return typedList.where(where).toList();
   }
