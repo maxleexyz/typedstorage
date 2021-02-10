@@ -77,7 +77,7 @@ void main() {
       store.addToList<AType>(ps);
     }
 
-    for (final pp in store.findType<AType>((item) => item.name.startsWith("A"), (a, b) => a.name.length.compareTo(b.name.length), () => AType())){
+    for (final pp in store.findType<AType>(where:(item) => item.name.startsWith("A"), sort:(a, b) => a.name.length.compareTo(b.name.length), creator:() => AType())){
       print(pp);
     }
 

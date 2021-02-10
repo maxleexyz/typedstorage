@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 abstract class ISerializable {
   Map serialize();
@@ -136,7 +137,18 @@ class TypeStorage {
     coreStorage[T] = list;
   }
 
-  List<T> findType<T extends ISerializable>(bool Function(T) where, int Function(T, T) sort, Function() creator){
+  List<T> listAll<T extends ISerializable>(Function() creator) {
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
+    final List<T> typedList = <T>[];
+    for (final map in list){
+      final obj = creator();
+      obj.deSerialize(map as Map);
+      typedList.add(obj);
+    }
+    return typedList;
+  }
+
+  List<T> findType<T extends ISerializable>({@required bool Function(T) where, int Function(T, T) sort, Function() creator}){
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
     final List<T> typedList = <T>[];
     for (final map in list){
