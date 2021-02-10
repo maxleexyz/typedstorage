@@ -160,6 +160,14 @@ class TypeStorage {
     return typedList.where(where).toList();
   }
 
-
+  T listFirst<T extends ISerializable>(Function() creator){
+    final List list = coreStorage["LIST:" + T.toString()] ?? [];
+    if (list.length > 0){
+      final obj = creator();
+      obj.deSerialize(list[0] as Map);
+      return obj;
+    }
+    return null;
+  }
 
 }
