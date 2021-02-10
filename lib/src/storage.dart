@@ -218,7 +218,7 @@ class TypeStorage {
       throw IndexError(position, list);
     }
     list.removeAt(position);
-    coreStorage[T] = list;
+    coreStorage["LIST:" + T.toString()]  = list;
   }
 
   void updateAt<T extends ISerializable>(int position, T item){
@@ -227,7 +227,7 @@ class TypeStorage {
       throw IndexError(position, list);
     }
     list[position] = item.serialize();
-    coreStorage[T] = list;
+    coreStorage["LIST:" + T.toString()]  = list;
   }
 
   List<T> listAll<T extends ISerializable>(Function() creator) {

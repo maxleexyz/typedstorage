@@ -1,6 +1,6 @@
 name: typedstorage
 description: Typed store data based on a local file support saving data encrypted.
-version: 0.0.5
+version: 0.0.6
 author: Alexander.Li
 homepage: https://github.com/ipconfiger/typedstorage
 
