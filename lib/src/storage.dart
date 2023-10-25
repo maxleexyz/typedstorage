@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 abstract class ISerializable {
@@ -14,7 +14,6 @@ abstract class ICryptable {
 }
 
 class TypeStorage {
-
   static final TypeStorage _singleton = TypeStorage._internal();
 
   factory TypeStorage() {
@@ -23,18 +22,21 @@ class TypeStorage {
 
   TypeStorage._internal();
 
-  String filePath;
+  late String filePath;
 
-  ICryptable cryptor;
+  ICryptable? cryptor;
 
-  TypeStorage init(String storageFilepath, {ICryptable cryptor}){
+  TypeStorage init(
+    String storageFilepath, {
+    required ICryptable cryptor,
+  }) {
     this.cryptor = cryptor;
-    Timer.periodic(new Duration(seconds: 10), (timer) async{
+    Timer.periodic(new Duration(seconds: 10), (timer) async {
       await this.save();
     });
-    if (inited){
+    if (inited) {
       return this;
-    }else {
+    } else {
       filePath = storageFilepath;
       inited = true;
       return this;
@@ -43,42 +45,48 @@ class TypeStorage {
 
   bool inited = false;
 
-  Map coreStorage;
-  String serialized;
+  late Map coreStorage;
+  late String serialized;
   Map<String, dynamic> namedListsKeys = Map<String, dynamic>();
   Map<String, dynamic> namedListsType = Map<String, dynamic>();
+
+  static const _encryptedKey = "encrypted:";
 
   Future reload() async {
     File file = File(filePath);
     if (await file.exists()) {
       final String savedStr = await file.readAsString();
-      if (savedStr.startsWith('encrypted:')){
+      if (savedStr.startsWith(_encryptedKey)) {
         final b64str = savedStr.substring(10);
-        final rawBytes = await cryptor.process(base64Decode(b64str));
-        serialized = utf8.decode(rawBytes.toList());
-      }else{
-        serialized=savedStr;
+        final rawBytes = await cryptor?.process(base64Decode(b64str));
+        serialized = utf8.decode(rawBytes?.toList() ?? []);
+      } else {
+        serialized = savedStr;
       }
-      if (serialized.isEmpty){
+      if (serialized.isEmpty) {
         coreStorage = {};
-      }else {
+      } else {
         coreStorage = jsonDecode(serialized);
       }
-    }else{
+    } else {
       coreStorage = {};
     }
   }
 
   Future save() async {
     final current = jsonEncode(coreStorage);
-    if (current!=serialized){
+    if (current != serialized) {
       File file = File(filePath);
       final writer = file.openWrite();
       serialized = current;
       var storedStr;
-      if (cryptor!=null){
-        storedStr = "encrypted:" + base64Encode((await cryptor.process(Uint8List.fromList(utf8.encode(serialized)))).toList());
-      }else{
+      if (cryptor != null) {
+        storedStr = _encryptedKey +
+            base64Encode((await cryptor
+                        ?.process(Uint8List.fromList(utf8.encode(serialized))))
+                    ?.toList() ??
+                []);
+      } else {
         storedStr = serialized;
       }
       writer.add(utf8.encode(storedStr));
@@ -86,7 +94,7 @@ class TypeStorage {
     }
   }
 
-  bool createNamedList<T>(String name, T Function() creator){
+  bool createNamedList<T>(String name, T Function() creator) {
     assert(!this.namedListsKeys.containsKey(name));
     assert(!this.namedListsType.containsKey(name));
     this.namedListsKeys[name] = creator;
@@ -95,7 +103,7 @@ class TypeStorage {
     return true;
   }
 
-  bool deleteNamedList(String name){
+  bool deleteNamedList(String name) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     this.namedListsKeys.remove(name);
@@ -104,7 +112,7 @@ class TypeStorage {
     return true;
   }
 
-  void namedListAppend<T extends ISerializable>(String name, T item){
+  void namedListAppend<T extends ISerializable>(String name, T item) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     assert(this.namedListsType[name] == T.toString());
@@ -113,14 +121,14 @@ class TypeStorage {
     coreStorage["NAMED_LIST:$name"] = list;
   }
 
-  List<T> namedListAll<T extends ISerializable>(String name){
+  List<T> namedListAll<T extends ISerializable>(String name) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     assert(this.namedListsType[name] == T.toString());
     final creator = this.namedListsKeys[name] as T Function();
     final List list = coreStorage["NAMED_LIST:$name"];
     List<T> results = <T>[];
-    for (final Map item in list){
+    for (final Map item in list) {
       final obj = creator();
       obj.deSerialize(item);
       results.add(obj);
@@ -128,19 +136,24 @@ class TypeStorage {
     return results;
   }
 
-  List<T> namedListQuery<T extends ISerializable>(String name, {@required bool Function(T) where, int Function(T, T) sort, Function() creator}){
+  List<T> namedListQuery<T extends ISerializable>(
+    String name, {
+    required bool Function(T) where,
+    int Function(T, T)? sort,
+    Function()? creator,
+  }) {
     List<T> namedList = namedListAll<T>(name);
     namedList.sort(sort);
     return namedList.where(where).toList();
   }
 
-  T namedListFirst<T extends ISerializable>(String name){
+  T? namedListFirst<T extends ISerializable>(String name) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     assert(this.namedListsType[name] == T.toString());
     final creator = this.namedListsKeys[name] as T Function();
     final List list = coreStorage["NAMED_LIST:$name"];
-    if(list.length>0){
+    if (list.length > 0) {
       final obj = creator();
       obj.deSerialize(list[0]);
       return obj;
@@ -148,7 +161,7 @@ class TypeStorage {
     return null;
   }
 
-  void namedListRemoveAt<T extends ISerializable>(String name, int index){
+  void namedListRemoveAt<T extends ISerializable>(String name, int index) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     assert(this.namedListsType[name] == T.toString());
@@ -157,7 +170,8 @@ class TypeStorage {
     coreStorage["NAMED_LIST:$name"] = list;
   }
 
-  void nameListUpdateAt<T extends ISerializable>(String name, int index, T item){
+  void nameListUpdateAt<T extends ISerializable>(
+      String name, int index, T item) {
     assert(this.namedListsKeys.containsKey(name));
     assert(this.namedListsType.containsKey(name));
     assert(this.namedListsType[name] == T.toString());
@@ -166,45 +180,46 @@ class TypeStorage {
     coreStorage["NAMED_LIST:$name"] = list;
   }
 
-  void namedListKeepWhere<T extends ISerializable>(String name, {@required bool Function(T) where}){
+  void namedListKeepWhere<T extends ISerializable>(
+    String name, {
+    required bool Function(ISerializable) where,
+  }) {
     final list = this.namedListAll(name);
     final newList = list.where(where).toList();
     final resultList = <Map>[];
-    for (final item in newList){
+    for (final item in newList) {
       resultList.add(item.serialize());
     }
     coreStorage["NAMED_LIST:$name"] = list;
   }
 
-
-  void setValue<T>(String key, T value){
+  void setValue<T>(String key, T value) {
     coreStorage[key] = value;
   }
 
-  T getValue<T>(String key){
+  T getValue<T>(String key) {
     return coreStorage[key] as T;
   }
 
-  void setObject(String key, ISerializable value){
+  void setObject(String key, ISerializable value) {
     coreStorage[key] = value.serialize();
   }
 
-  T getObject<T extends ISerializable>(String key, T Function() creator){
+  T getObject<T extends ISerializable>(String key, T Function() creator) {
     final obj = creator();
     obj.deSerialize(coreStorage[key]);
     return obj;
   }
 
-  void addToList<T extends ISerializable>(T value){
-
+  void addToList<T extends ISerializable>(T value) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
     list.add(value.serialize());
     coreStorage["LIST:" + T.toString()] = list;
   }
 
-  T listPosition<T extends ISerializable>(int position, T Function() creator) {
+  T? listPosition<T extends ISerializable>(int position, T Function() creator) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
-    if (position >= list.length){
+    if (position >= list.length) {
       return null;
     }
     final T obj = creator();
@@ -212,28 +227,28 @@ class TypeStorage {
     return obj;
   }
 
-  void removeAt<T extends ISerializable>(int position){
+  void removeAt<T extends ISerializable>(int position) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
-    if ( position >= list.length || position < 0) {
-      throw IndexError(position, list);
+    if (position >= list.length || position < 0) {
+      throw IndexError.withLength(position, list.length);
     }
     list.removeAt(position);
-    coreStorage["LIST:" + T.toString()]  = list;
+    coreStorage["LIST:" + T.toString()] = list;
   }
 
-  void updateAt<T extends ISerializable>(int position, T item){
+  void updateAt<T extends ISerializable>(int position, T item) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
-    if ( position >= list.length || position < 0) {
-      throw IndexError(position, list);
+    if (position >= list.length || position < 0) {
+      throw IndexError.withLength(position, list.length);
     }
     list[position] = item.serialize();
-    coreStorage["LIST:" + T.toString()]  = list;
+    coreStorage["LIST:" + T.toString()] = list;
   }
 
   List<T> listAll<T extends ISerializable>(Function() creator) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
     final List<T> typedList = <T>[];
-    for (final map in list){
+    for (final map in list) {
       final obj = creator();
       obj.deSerialize(map as Map);
       typedList.add(obj);
@@ -241,20 +256,23 @@ class TypeStorage {
     return typedList;
   }
 
-  List<T> findType<T extends ISerializable>({@required bool Function(T) where, int Function(T, T) sort, Function() creator}){
+  List<T> findType<T extends ISerializable>({
+    required bool Function(T) where,
+    int Function(T, T)? sort,
+    required Function() creator,
+  }) {
     final List<T> typedList = this.listAll<T>(creator);
     typedList.sort(sort);
     return typedList.where(where).toList();
   }
 
-  T listFirst<T extends ISerializable>(Function() creator){
+  T? listFirst<T extends ISerializable>(Function() creator) {
     final List list = coreStorage["LIST:" + T.toString()] ?? [];
-    if (list.length > 0){
+    if (list.length > 0) {
       final obj = creator();
       obj.deSerialize(list[0] as Map);
       return obj;
     }
     return null;
   }
-
 }

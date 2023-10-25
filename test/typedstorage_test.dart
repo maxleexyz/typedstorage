@@ -5,24 +5,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:typedstorage/src/storage.dart';
 import 'package:coidentity/coidentity.dart';
 
+class MyISharePreferences extends ISharePreferences {
+  @override
+  String? getString(String key) {
+    return null;
+  }
+
+  @override
+  void setString(String key, String? value) {}
+}
 
 class Process implements ICryptable {
-  CoreIdentity identity;
+  late CoreIdentity identity;
   Future init() async {
     identity = CoreIdentity();
-    identity.setup(EncryptMethod.SECP256K1, null);
+    identity.setup(EncryptMethod.SECP256K1, MyISharePreferences());
   }
-  static final Uint8List SECRET = Uint8List.fromList([0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,1,2]);
-  static final Uint8List IV = Uint8List.fromList([1,2,3,4,5,6,7,8]);
+
+  static final Uint8List secret = Uint8List.fromList(
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2]);
+  static final Uint8List iv = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
   @override
-  Future<Uint8List> process(Uint8List value) async{
-    return await identity.processFile(value, SECRET, IV);
+  Future<Uint8List> process(Uint8List value) async {
+    return await identity.processFile(value, secret, iv);
   }
 }
 
-class AType implements ISerializable{
-  String name;
-  int age;
+class AType implements ISerializable {
+  String? name;
+  int? age;
 
   @override
   void deSerialize(Map value) {
@@ -39,21 +50,20 @@ class AType implements ISerializable{
   String toString() {
     return jsonEncode(this.serialize());
   }
-
 }
 
-
 void main() {
-  test('test storage', () async{
-    String file_path = "/Users/alex/Projects/workspace/typedstorage/test/mydb.json";
+  test('test storage', () async {
+    String filePath =
+        "/Users/alex/Projects/workspace/typedstorage/test/mydb.json";
 
-    if (await File(file_path).exists()) {
-      File(file_path).deleteSync();
+    if (await File(filePath).exists()) {
+      File(filePath).deleteSync();
     }
 
     final encProcess = new Process();
     await encProcess.init();
-    final store = TypeStorage().init(file_path, cryptor: encProcess);
+    final store = TypeStorage().init(filePath, cryptor: encProcess);
     await store.reload();
 
     store.setValue<String>('testKey1', "哈哈哈");
@@ -61,23 +71,35 @@ void main() {
     print(store.getValue<String>('testKey1'));
     AType person = AType();
     person.name = "Alex";
-    person.age=18;
+    person.age = 18;
     store.setObject('Person', person);
 
     await store.save();
 
-    final p = store.getObject('Person', ()=>AType());
+    final p = store.getObject('Person', () => AType());
     print(p);
 
-    final names = ['Bob', 'Alice', 'John', 'Celina', 'Eda', 'Meachle', 'Alex', 'Bill'];
-    for (final name in names){
+    final names = [
+      'Bob',
+      'Alice',
+      'John',
+      'Celina',
+      'Eda',
+      'Meachle',
+      'Alex',
+      'Bill'
+    ];
+    for (final name in names) {
       final ps = AType();
       ps.name = name;
-      ps.age=0;
+      ps.age = 0;
       store.addToList<AType>(ps);
     }
 
-    for (final pp in store.findType<AType>(where:(item) => item.name.startsWith("A"), sort:(a, b) => a.name.length.compareTo(b.name.length), creator:() => AType())){
+    for (final pp in store.findType<AType>(
+        where: (item) => item.name?.startsWith("A") == true,
+        sort: (a, b) => (a.name?.length ?? 0).compareTo((b.name?.length ?? 0)),
+        creator: () => AType())) {
       print(pp);
     }
 
@@ -87,24 +109,19 @@ void main() {
 
     store.createNamedList(namedKey, () => AType());
 
-    for (final name in names){
+    for (final name in names) {
       final ps = AType();
       ps.name = name;
-      ps.age=0;
+      ps.age = 0;
       store.namedListAppend<AType>(namedKey, ps);
     }
 
     final first = store.namedListFirst<AType>(namedKey);
-    expect(first.name, names[0]);
+    expect(first?.name, names[0]);
 
-    final ls = store.namedListQuery<AType>(namedKey, where: (item) => item.name.startsWith('A'), sort: (a, b)=> a.age.compareTo(b.age));
+    final ls = store.namedListQuery<AType>(namedKey,
+        where: (item) => item.name?.startsWith('A') == true,
+        sort: (a, b) => (a.age ?? 0).compareTo((b.age ?? 0)));
     print('$ls');
-
-
-
-
-
-
-
   });
 }
