@@ -54,8 +54,7 @@ class AType implements ISerializable {
 
 void main() {
   test('test storage', () async {
-    String filePath =
-        "/Users/alex/Projects/workspace/typedstorage/test/mydb.json";
+    String filePath = "/Users/max/SourceCode/fork/typedstorage/test/mydb.json";
 
     if (await File(filePath).exists()) {
       File(filePath).deleteSync();

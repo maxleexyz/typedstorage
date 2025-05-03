@@ -46,7 +46,7 @@ class TypeStorage {
   bool inited = false;
 
   late Map coreStorage;
-  late String serialized;
+  String? serialized;
   Map<String, dynamic> namedListsKeys = Map<String, dynamic>();
   Map<String, dynamic> namedListsType = Map<String, dynamic>();
 
@@ -63,10 +63,10 @@ class TypeStorage {
       } else {
         serialized = savedStr;
       }
-      if (serialized.isEmpty) {
+      if (serialized == null || serialized?.isEmpty == true) {
         coreStorage = {};
       } else {
-        coreStorage = jsonDecode(serialized);
+        coreStorage = jsonDecode(serialized!);
       }
     } else {
       coreStorage = {};
@@ -83,7 +83,7 @@ class TypeStorage {
       if (cryptor != null) {
         storedStr = _encryptedKey +
             base64Encode((await cryptor
-                        ?.process(Uint8List.fromList(utf8.encode(serialized))))
+                        ?.process(Uint8List.fromList(utf8.encode(serialized!))))
                     ?.toList() ??
                 []);
       } else {
